@@ -19,7 +19,8 @@ import {
   ShieldCheck,
   Search,
   CheckSquare,
-  Square
+  Square,
+  User
 } from "lucide-react";
 
 import { env } from "./lib/env";
@@ -1172,7 +1173,10 @@ export default function App() {
       <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
         {/* Document Ingestion & Details Panel */}
         {activeTab === "documents" ? (
-          <div className="flex-1 p-8 overflow-y-auto max-w-6xl w-full mx-auto animate-slide-in">
+          <div 
+            className="flex-1 p-8 overflow-y-auto max-w-6xl w-full mx-auto animate-slide-in"
+            style={{ maxHeight: 'calc(100vh - 20px)' }}
+          >
             {/* Header section */}
             <div className="mb-8">
               <h2 className="text-xl font-bold">{isRtl ? "إدارة مستندات المشروع" : "Project Documents"}</h2>
@@ -1550,7 +1554,10 @@ export default function App() {
             </div>
 
             {/* Chat History Messages Scroll */}
-            <div className="flex-1 overflow-y-auto p-8 space-y-6">
+            <div 
+              className="flex-1 overflow-y-auto p-8 space-y-6"
+              style={{ maxHeight: 'calc(100vh - 160px)' }}
+            >
               {messages.length === 0 ? (
                 <div className="text-center max-w-md mx-auto pt-20">
                   <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mx-auto mb-4">
@@ -1572,29 +1579,31 @@ export default function App() {
                     className={`flex gap-4 max-w-3xl ${msg.role === "user" ? "ml-auto flex-row-reverse" : "mr-auto"}`}
                   >
                     {/* Role Avatar */}
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold border ${
-                      msg.role === "user" 
-                        ? "bg-[#1e293b] text-slate-200 border-[#2e3b4e]" 
-                        : "bg-blue-500/10 text-blue-400 border-blue-500/20"
-                    }`}>
-                      {msg.role === "user" ? "U" : "AI"}
-                    </div>
+                    {msg.role === "user" ? (
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                        <User className="w-4 h-4" />
+                      </div>
+                    ) : (
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-purple-500/10 text-purple-400 border border-purple-500/20 shadow-sm shadow-purple-500/5">
+                        <Sparkles className="w-4 h-4 animate-pulse-glow" />
+                      </div>
+                    )}
 
                     {/* Message Content Bubble */}
-                    <div className="flex flex-col gap-2 min-w-0">
-                      <div className={`rounded-xl p-4 text-sm leading-relaxed ${
+                    <div className="flex flex-col gap-2 min-w-0 flex-1">
+                      <div className={`rounded-2xl p-4 text-sm leading-relaxed ${
                         msg.role === "user"
-                          ? "bg-blue-600 text-white rounded-tr-none"
-                          : "bg-[#121824] border border-[#1e293b] text-slate-100 rounded-tl-none"
+                          ? "bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-tr-sm shadow-lg shadow-blue-500/10 ml-auto"
+                          : "bg-[#121824]/90 border border-[#1e293b] text-slate-100 rounded-tl-sm shadow-md mr-auto"
                       }`}>
                         <div>{renderMarkdown(msg.content || "...")}</div>
                       </div>
 
                       {/* Sources and Grounding status (assistant only) */}
                       {msg.role === "assistant" && (
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2 mt-1 px-1">
                           {/* Grounding check badge */}
-                          {msg.isGrounded !== undefined && (
+                          {msg.isGrounded !== undefined && msg.sources && msg.sources.length > 0 && (
                             <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded ${
                               msg.isGrounded 
                                 ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"

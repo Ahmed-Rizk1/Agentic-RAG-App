@@ -159,6 +159,36 @@ async def verify_grounding(context: str, answer: str) -> tuple[bool, str]:
 
 # --- SSE Streaming Manager ---
 
+def is_conversational(query: str) -> bool:
+    q = query.strip().lower().rstrip("!?.")
+    # Common English greetings, thanks, closings, acknowledgements
+    english_casual = {
+        "hi", "hello", "hey", "greetings", "good morning", "good afternoon", "good evening",
+        "thanks", "thank you", "thank you very much", "many thanks", "thanks a lot",
+        "ok", "okay", "got it", "noted", "great", "awesome", "perfect", "cool",
+        "bye", "goodbye", "see you", "thank", "thanks!"
+    }
+    
+    # Common Arabic greetings, thanks, closings, acknowledgements
+    arabic_casual = {
+        "مرحبا", "مرحباً", "اهلا", "أهلاً", "السلام عليكم", "صباح الخير", "مساء الخير",
+        "شكرا", "شكراً", "شكرا لك", "تسلم", "تسلم ايدك", "يعطيك العافية", "يعطيكم العافية",
+        "تمام", "ماشي", "حسنا", "حسناً", "جيد", "ممتاز", "مع السلامة", "شكر"
+    }
+    
+    if q in english_casual or q in arabic_casual:
+        return True
+        
+    # Check if it starts with standard thank/greeting words and is very short
+    words = q.split()
+    if len(words) <= 3:
+        first_word = words[0]
+        if first_word in {"hi", "hello", "hey", "thanks", "thank", "ok", "okay", "اهلا", "شكرا", "مرحبا", "تسلم"}:
+            return True
+            
+    return False
+
+
 async def handle_chat_sse(
     project_id: uuid.UUID,
     query_text: str,
@@ -195,8 +225,15 @@ async def handle_chat_sse(
         db.add(user_message)
         await db.commit()
         
-        # 3. Retrieve chunks via hybrid search
-        chunks = await hybrid_search(db, project_id, query_text, document_ids)
+        # Check if query is conversational/greeting/acknowledgement
+        is_casual = is_conversational(query_text)
+        
+        # 3. Retrieve chunks via hybrid search (only if not casual greeting)
+        if not is_casual:
+            chunks = await hybrid_search(db, project_id, query_text, document_ids)
+        else:
+            chunks = []
+            
         sources_list = []
         context_parts = []
         
@@ -213,13 +250,21 @@ async def handle_chat_sse(
         
         # 4. Stream response generation
         context_str = "\n\n".join(context_parts)
-        system_prompt = (
-            "You are a helpful procurement intelligence assistant for Arabic procurement and tenders.\n"
-            "Answer the user's question using ONLY the provided context. If the answer cannot be found in the context, "
-            "politely state that the information is not present in the document. Do not make up facts.\n"
-            "Respond in the language of the query (Arabic or English)."
-        )
-        prompt = f"CONTEXT:\n{context_str}\n\nQUESTION:\n{query_text}"
+        if is_casual:
+            system_prompt = (
+                "You are a helpful procurement intelligence assistant for Arabic procurement and tenders.\n"
+                "The user is sending a general greeting, thank you, or conversational statement.\n"
+                "Respond to them politely, naturally, and conversationally in their language (Arabic or English). Keep it brief."
+            )
+            prompt = f"USER MESSAGE:\n{query_text}"
+        else:
+            system_prompt = (
+                "You are a helpful procurement intelligence assistant for Arabic procurement and tenders.\n"
+                "Answer the user's question using ONLY the provided context. If the answer cannot be found in the context, "
+                "politely state that the information is not present in the document. Do not make up facts.\n"
+                "Respond in the language of the query (Arabic or English)."
+            )
+            prompt = f"CONTEXT:\n{context_str}\n\nQUESTION:\n{query_text}"
         
         generated_answer = ""
         try:
@@ -232,7 +277,12 @@ async def handle_chat_sse(
             return
             
         # 5. Grounding check
-        is_grounded, explanation = await verify_grounding(context_str, generated_answer)
+        if is_casual:
+            is_grounded = True
+            explanation = "Conversational message bypassed grounding check."
+        else:
+            is_grounded, explanation = await verify_grounding(context_str, generated_answer)
+            
         final_answer = generated_answer
         
         # If not grounded, overwrite with polite fallback
