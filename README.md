@@ -10,7 +10,7 @@ It combines **Hybrid RAG (Vector + BM25)**, **Multi-Agent Workflows (via LangGra
 
 <video src="2026-06-14%2019-21-13.mp4" width="100%" controls></video>
 
-_ you can view or download the demo video from [here]([https://drive.google.com/file/d/1yieVtKRwgzPdBeRfOkSOWB1Vui-i5JI2/view?usp=sharing](https://www.linkedin.com/posts/ahmedrizkgawish_ai-generativeai-aiengineering-ugcPost-7476240517291442176-0nS6/?utm_source=share&utm_medium=member_desktop&rcm=ACoAAEAbTpIBunk-yK4vaUQKGoz5aGVXBGaFFpE))._
+_ you can view or download the demo video from [here](https://www.linkedin.com/posts/ahmedrizkgawish_ai-generativeai-aiengineering-ugcPost-7476240517291442176-0nS6/?utm_source=share&utm_medium=member_desktop&rcm=ACoAAEAbTpIBunk-yK4vaUQKGoz5aGVXBGaFFpE)._
 
 ---
 ## 🚀 Key Features
