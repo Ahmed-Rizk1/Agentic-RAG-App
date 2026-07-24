@@ -65,60 +65,80 @@ def chunk_text(text: str, page_number: int, chunk_size: int = 1000, chunk_overla
 
 
 from app.services.llm import call_llm_json
+from app.services.cache import cache_service
 
 async def call_hf_embeddings(texts: list[str]) -> list[list[float]]:
-    """Calls Hugging Face Inference API for BGE-M3 embeddings."""
-    dim = 1024
-    if settings.hf_api_key == "hf_placeholder":
-        # Generate mock embeddings
-        logger.warning("HF API key is placeholder. Returning mock random embeddings.")
-        mock_list = []
-        for text in texts:
-            # Seed based on text hash to have deterministic embeddings for testing
-            np.random.seed(hash(text) % 2**32)
-            vec = np.random.randn(dim)
-            vec = vec / np.linalg.norm(vec)
-            mock_list.append(vec.tolist())
-        return mock_list
+    """Calls Hugging Face Inference API for BGE-M3 embeddings with Redis/in-memory caching."""
+    if not texts:
+        return []
 
-    url = f"https://api-inference.huggingface.co/pipeline/feature-extraction/{settings.hf_embedding_model}"
-    headers = {"Authorization": f"Bearer {settings.hf_api_key}"}
-    
-    # Process in batches of 16 to avoid payload limits
-    batch_size = 16
-    embeddings = []
-    
-    try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            for i in range(0, len(texts), batch_size):
-                batch = texts[i:i + batch_size]
-                response = await client.post(
-                    url, 
-                    headers=headers, 
-                    json={"inputs": batch, "options": {"wait_for_model": True}}
-                )
-                if response.status_code != 200:
-                    raise Exception(f"Hugging Face embedding API failed: {response.text}")
-                
-                res_json = response.json()
-                # If batch has size 1, some APIs might return a single vector or a list
-                if isinstance(res_json, list):
-                    if len(batch) == 1 and not isinstance(res_json[0], list):
-                        embeddings.append(res_json)
-                    else:
-                        embeddings.extend(res_json)
-                else:
-                    raise Exception(f"Unexpected HF response format: {res_json}")
-        return embeddings
-    except Exception as e:
-        logger.warning(f"HF embedding connection/API failed: {str(e)}. Falling back to mock embeddings.")
-        mock_list = []
-        for text in texts:
+    # 1. Check cache for cached embeddings
+    results: list[Optional[list[float]]] = [None] * len(texts)
+    uncached_indices: list[int] = []
+    uncached_texts: list[str] = []
+
+    for idx, text in enumerate(texts):
+        cached_vec = await cache_service.get_embedding(text)
+        if cached_vec is not None:
+            results[idx] = cached_vec
+        else:
+            uncached_indices.append(idx)
+            uncached_texts.append(text)
+
+    if not uncached_texts:
+        return [res for res in results if res is not None]
+
+    dim = 1024
+    fetched_embeddings: list[list[float]] = []
+
+    if settings.hf_api_key == "hf_placeholder":
+        # Generate mock embeddings for uncached texts
+        logger.warning("HF API key is placeholder. Returning mock random embeddings.")
+        for text in uncached_texts:
             np.random.seed(hash(text) % 2**32)
             vec = np.random.randn(dim)
             vec = vec / np.linalg.norm(vec)
-            mock_list.append(vec.tolist())
-        return mock_list
+            fetched_embeddings.append(vec.tolist())
+    else:
+        url = f"https://api-inference.huggingface.co/pipeline/feature-extraction/{settings.hf_embedding_model}"
+        headers = {"Authorization": f"Bearer {settings.hf_api_key}"}
+        batch_size = 16
+
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(25.0, connect=3.0)) as client:
+                for i in range(0, len(uncached_texts), batch_size):
+                    batch = uncached_texts[i:i + batch_size]
+                    response = await client.post(
+                        url, 
+                        headers=headers, 
+                        json={"inputs": batch, "options": {"wait_for_model": True}}
+                    )
+                    if response.status_code != 200:
+                        raise Exception(f"Hugging Face embedding API failed: {response.text}")
+                    
+                    res_json = response.json()
+                    if isinstance(res_json, list):
+                        if len(batch) == 1 and not isinstance(res_json[0], list):
+                            fetched_embeddings.append(res_json)
+                        else:
+                            fetched_embeddings.extend(res_json)
+                    else:
+                        raise Exception(f"Unexpected HF response format: {res_json}")
+        except Exception as e:
+            logger.warning(f"HF embedding connection/API failed: {str(e)}. Falling back to mock embeddings.")
+            for text in uncached_texts:
+                np.random.seed(hash(text) % 2**32)
+                vec = np.random.randn(dim)
+                vec = vec / np.linalg.norm(vec)
+                fetched_embeddings.append(vec.tolist())
+
+    # 2. Store newly fetched embeddings in cache and populate results
+    for idx_pos, orig_idx in enumerate(uncached_indices):
+        vec = fetched_embeddings[idx_pos]
+        results[orig_idx] = vec
+        await cache_service.set_embedding(uncached_texts[idx_pos], vec)
+
+    return [res for res in results if res is not None]
 
 
 # --- Graph Nodes ---

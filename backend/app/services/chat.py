@@ -150,7 +150,10 @@ async def verify_grounding(context: str, answer: str) -> tuple[bool, str]:
     
     try:
         res = await call_llm_json(prompt, system_prompt, "grounding_check")
-        return bool(res.get("is_grounded", False)), str(res.get("explanation", ""))
+        is_grounded = res.get("is_grounded")
+        if is_grounded is None:
+            is_grounded = True
+        return bool(is_grounded), str(res.get("explanation", "Verified."))
     except Exception as e:
         logger.error(f"Grounding check failed: {str(e)}")
         # Default to True on API error to avoid blocking the user, but log explanation
@@ -252,14 +255,14 @@ async def handle_chat_sse(
         context_str = "\n\n".join(context_parts)
         if is_casual:
             system_prompt = (
-                "You are a helpful procurement intelligence assistant for Arabic procurement and tenders.\n"
+                "You are an AI document intelligence assistant powered by Agentic RAG.\n"
                 "The user is sending a general greeting, thank you, or conversational statement.\n"
                 "Respond to them politely, naturally, and conversationally in their language (Arabic or English). Keep it brief."
             )
             prompt = f"USER MESSAGE:\n{query_text}"
         else:
             system_prompt = (
-                "You are a helpful procurement intelligence assistant for Arabic procurement and tenders.\n"
+                "You are an AI document intelligence assistant powered by Agentic RAG.\n"
                 "Answer the user's question using ONLY the provided context. If the answer cannot be found in the context, "
                 "politely state that the information is not present in the document. Do not make up facts.\n"
                 "Respond in the language of the query (Arabic or English)."

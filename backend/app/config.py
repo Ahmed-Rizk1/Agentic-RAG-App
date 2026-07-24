@@ -2,8 +2,9 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    # --- Database ---
+    # --- Database & Cache ---
     database_url: str  # e.g. postgresql+asyncpg://user:pass@localhost:5432/apip
+    redis_url: str = "redis://localhost:6379/0"
 
     # --- Auth / JWT ---
     jwt_secret: str

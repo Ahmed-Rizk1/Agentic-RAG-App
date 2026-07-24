@@ -10,11 +10,8 @@ import {
   LogOut,
   Globe,
   AlertCircle,
-  Clock,
   Sparkles,
   Info,
-  Calendar,
-  FileBadge,
   ChevronRight,
   ShieldCheck,
   Search,
@@ -808,8 +805,8 @@ export default function App() {
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-purple-500/10 text-purple-400 mb-3 border border-purple-500/20">
               <Sparkles className="w-6 h-6 animate-pulse-glow" />
             </div>
-            <h1 className="text-2xl font-bold tracking-tight">APIP</h1>
-            <p className="text-sm text-slate-400 mt-1">Arabic Procurement Intelligence Platform</p>
+            <h1 className="text-2xl font-bold tracking-tight">Agentic RAG</h1>
+            <p className="text-sm text-slate-400 mt-1">Multi-Agent Document Intelligence Platform</p>
           </div>
 
           <form onSubmit={isRegistering ? handleRegister : handleLogin} className="flex flex-col gap-4">
@@ -893,7 +890,7 @@ export default function App() {
         <header className="h-16 border-b border-[#1e293b] px-8 flex items-center justify-between bg-[#0b101c]/80 backdrop-blur-md flex-shrink-0">
           <div className="flex items-center gap-3">
             <Sparkles className="w-5 h-5 text-blue-500" />
-            <h1 className="text-lg font-bold tracking-tight">APIP — Arabic Procurement Intelligence Platform</h1>
+            <h1 className="text-lg font-bold tracking-tight">Agentic RAG — Multi-Agent Document Intelligence Platform</h1>
           </div>
           <div className="flex items-center gap-4">
             {user && (
@@ -1217,11 +1214,11 @@ export default function App() {
               )}
             </div>
 
-            {/* Document details split view */}
+            {/* Document details view */}
             {selectedDoc ? (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="flex flex-col gap-6 max-w-5xl mx-auto w-full">
                 {/* Main Details column */}
-                <div className="lg:col-span-2 flex flex-col gap-6">
+                <div className="flex flex-col gap-6 w-full">
                   {/* General details card */}
                   <div className="glass-panel p-6">
                     <div className="flex items-center justify-between mb-4 border-b border-[#1e293b] pb-4">
@@ -1449,83 +1446,6 @@ export default function App() {
                       )}
                     </div>
                   )}
-                </div>
-
-                {/* Metadata column */}
-                <div className="lg:col-span-1">
-                  <div className="glass-panel p-6 h-full">
-                    <h3 className="font-bold text-slate-200 mb-4 flex items-center gap-2">
-                      <FileBadge className="w-4 h-4 text-purple-400" />
-                      {isRtl ? "البيانات المستخرجة" : "Extracted Intelligence"}
-                    </h3>
-
-                    {!selectedDoc.metadata ? (
-                      <div className="text-center p-8 text-xs text-slate-400 border border-dashed border-[#1e293b] rounded-lg">
-                        <Clock className="w-8 h-8 text-slate-500 mx-auto mb-2" />
-                        {isRtl ? "جاري معالجة البيانات..." : "Metadata still processing..."}
-                      </div>
-                    ) : (
-                      <div className="flex flex-col gap-4 text-xs">
-                        <div className="p-3 bg-[#0a0e17]/50 rounded-lg border border-[#1e293b]">
-                          <span className="text-slate-400 block mb-0.5">{isRtl ? "الجهة المنظمة" : "Organization"}</span>
-                          <span className="font-semibold text-slate-200 block">
-                            {selectedDoc.metadata.organization_name || "Not specified"}
-                          </span>
-                        </div>
-
-                        <div className="p-3 bg-[#0a0e17]/50 rounded-lg border border-[#1e293b]">
-                          <span className="text-slate-400 block mb-0.5">{isRtl ? "رقم العطاء/المناقصة" : "Tender Number"}</span>
-                          <span className="font-semibold text-slate-200 block">
-                            {selectedDoc.metadata.tender_number || "Not specified"}
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="p-3 bg-[#0a0e17]/50 rounded-lg border border-[#1e293b]">
-                            <span className="text-slate-400 block mb-0.5">{isRtl ? "الميزانية" : "Budget"}</span>
-                            <span className="font-semibold text-slate-200 block">
-                              {selectedDoc.metadata.budget_amount 
-                                ? `${selectedDoc.metadata.budget_amount.toLocaleString()} ${selectedDoc.metadata.budget_currency || ""}`
-                                : "N/A"}
-                            </span>
-                          </div>
-                          <div className="p-3 bg-[#0a0e17]/50 rounded-lg border border-[#1e293b]">
-                            <span className="text-slate-400 block mb-0.5">{isRtl ? "اللغة الرئيسية" : "Language"}</span>
-                            <span className="font-semibold text-slate-200 block">
-                              {selectedDoc.metadata.language || "N/A"}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="p-3 bg-[#0a0e17]/50 rounded-lg border border-[#1e293b]">
-                          <span className="text-slate-400 block mb-1 flex items-center gap-1">
-                            <Calendar className="w-3.5 h-3.5 text-blue-400" />
-                            {isRtl ? "آخر موعد للتقديم" : "Submission Deadline"}
-                          </span>
-                          <span className="font-semibold text-slate-200 block">
-                            {selectedDoc.metadata.submission_deadline || "Not specified"}
-                          </span>
-                        </div>
-
-                        <div>
-                          <span className="text-slate-400 block mb-2 font-semibold">
-                            {isRtl ? "الشهادات المطلوبة" : "Required Certifications"}
-                          </span>
-                          {selectedDoc.metadata.certifications && selectedDoc.metadata.certifications.length > 0 ? (
-                            <div className="flex flex-wrap gap-1.5">
-                              {selectedDoc.metadata.certifications.map((c, i) => (
-                                <span key={i} className="px-2 py-1 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20 text-[10px]">
-                                  {c}
-                                </span>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="text-slate-500 block italic">{isRtl ? "لا توجد شهادات مطلوبة" : "None identified"}</span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
                 </div>
               </div>
             ) : (

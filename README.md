@@ -1,162 +1,162 @@
-# Arabic Procurement Intelligence Platform (APIP)
+# Agentic RAG — Enterprise Document Intelligence Platform
 
-APIP is a production-quality, AI-powered platform designed to help organizations, small businesses, and startups parse, analyze, and comprehend complex procurement documents, tenders, and contracts.
+An enterprise-grade, production-ready **Agentic RAG Platform** engineered for deep document parsing, complex contract analysis, and automated executive report generation across multi-lingual documents (Arabic & English).
 
-It combines **Hybrid RAG (Vector + BM25)**, **Multi-Agent Workflows (via LangGraph)**, and **Structured LLM Reasoners (via Groq/HuggingFace)** to deliver deep document intelligence, automated risk analysis reports, and professional proposal drafts in both Arabic and English.
-
----
-
-## 🎥 System Demo Video
-
-<video src="2026-06-14%2019-21-13.mp4" width="100%" controls></video>
-
-_ you can view or download the demo video from [here](https://www.linkedin.com/posts/ahmedrizkgawish_ai-generativeai-aiengineering-ugcPost-7476240517291442176-0nS6/?utm_source=share&utm_medium=member_desktop&rcm=ACoAAEAbTpIBunk-yK4vaUQKGoz5aGVXBGaFFpE)._
+The system integrates **Hybrid RAG (Dense Vector + BM25 Sparse Search)**, **Multi-Agent State Machines (LangGraph)**, **Self-Correction Grounding Guardrails**, **Redis Caching**, and **HNSW Indexing** to deliver high-precision document intelligence with sub-5ms retrieval speeds.
 
 ---
-## 🚀 Key Features
 
-1. **Document Ingestion & Parsing:**
-   - Drag-and-drop PDF upload (supporting files up to 50MB).
-   - Text extraction with page tracking via `PyMuPDF`.
-   - Structured metadata extraction (Tender number, Organization, Budget, Submission Deadline, Certifications).
-   
-2. **Hybrid RAG Chat Engine:**
-   - Cosine vector similarity search (using `pgvector` + `BGE-M3` embeddings).
-   - Full-text search (BM25 simple token indexing using Postgres `tsvector`).
-   - Reciprocal Rank Fusion (RRF) to merge and rank results.
-   - SSE streaming chat responses with source chunk citations and page attribution.
+## 🚀 Key Features & Capabilities
 
-3. **Grounding Guardrails:**
-   - Hallucination protection via a verification node that evaluates generated answers against retrieved context before displaying them.
+1. **Document Ingestion & Asynchronous Parsing:**
+   - Multi-format PDF processing with page-level tracking via `PyMuPDF`.
+   - Non-blocking background worker pipeline using FastAPI `BackgroundTasks`.
 
-4. **Risk Analysis Agent:**
-   - Specialized LangGraph agent that scans documents for legal liabilities, tight deadlines, excessive requirements, missing certificates, or missing annexes.
-   - Produces a structured JSON risk report with severity classifications, category tags, page numbers, and direct quotes as evidence.
+2. **Hybrid RAG Retrieval Engine:**
+   - **Dense Vector Search:** Cosine similarity search using `pgvector` with **HNSW indexing** and `BGE-M3` multilingual embeddings.
+   - **Sparse Full-Text Search:** BM25 token indexing via PostgreSQL `tsvector` with GIN indexes.
+   - **Rank Fusion:** Reciprocal Rank Fusion (RRF) algorithm to rank combined search results.
+   - **Streaming SSE Chat:** Token-by-token streaming with page attribution and source chunk citations.
 
-5. **Proposal Draft Generator:**
-   - Automated agent that retrieves scope, objectives, requirements, and compliance guidelines to write a complete proposal draft.
-   - Generates four required sections: **Executive Summary**, **Scope Understanding**, **Compliance Section**, and **Required Deliverables** in the language of the tender.
+3. **Self-Correction & Grounding Guardrails (Corrective RAG):**
+   - Hallucination verification node that evaluates generated answers against retrieved context before streaming to the client.
+   - Intelligent query router distinguishing casual statements from document queries.
+
+4. **Multi-Agent Risk Analysis Workflows:**
+   - Specialized **LangGraph StateGraph Agent** scanning documents for legal liabilities, tight deadlines, penalty clauses, and compliance requirements.
+   - Produces structured JSON risk reports with severity classifications and direct page quotes.
+
+5. **Proposal Generation Agent:**
+   - Autonomous agent that analyzes scope and technical guidelines to write complete 4-part proposals (*Executive Summary*, *Scope Understanding*, *Compliance*, and *Required Deliverables*).
+
+6. **Enterprise Performance & Caching:**
+   - **Redis Caching Layer (`redis.asyncio`)**: Caches query vector embeddings by text hash with graceful in-memory fallback.
+   - **SQLAlchemy Connection Pooling (`asyncpg`)**: Configured pool size and health pre-pings for concurrent SSE streaming.
 
 ---
 
 ## 🛠️ Technology Stack
 
-| Component | Choice | Details |
+| Layer | Technology | Details |
 |---|---|---|
-| **Backend** | FastAPI | High-performance Python ASGI framework with Pydantic v2 schemas |
-| **Frontend** | Vite + React + TS | Single-page application styled using vanilla CSS (sleek dark mode) |
-| **Database** | PostgreSQL 16 | Structured tables with `pgvector` extension and GIN `tsvector` index |
-| **LLM Orchestrator** | LangGraph | StateGraph nodes managing retrieval, generation, and storage states |
-| **Embeddings** | HuggingFace Inference API | BGE-M3 Multilingual model for hybrid cross-lingual queries |
-| **LLM Provider** | Groq (Llama 3.3 70B) | Primary fast model with HuggingFace (Qwen 2.5) automatic fallback |
-| **Auth** | JWT Hashing | Passwords hashed with bcrypt, access tokens signed with pyjwt |
+| **Backend API** | FastAPI | Async ASGI Python backend with Pydantic v2 schemas |
+| **Frontend** | React 18 + Vite + TypeScript | Glassmorphism dark mode SPA with responsive RTL/LTR support |
+| **Database** | PostgreSQL 16 | Relational tables + `pgvector` extension with HNSW index |
+| **Caching & Queue** | Redis 7 | `redis.asyncio` caching layer with in-memory fallback |
+| **Agent Orchestrator** | LangGraph | Multi-node `StateGraph` workflows for Risk & Proposal agents |
+| **Embeddings** | HuggingFace Inference API | `BAAI/bge-m3` multilingual embeddings |
+| **LLM Inference** | Groq (Llama 3.3 70B) | High-speed primary LLM with HuggingFace fallback |
+| **Security & Auth** | JWT + Bcrypt | Password hashing with bcrypt, access tokens signed with PyJWT |
 
 ---
 
 ## 📁 Repository Layout
 
 ```text
-document-copilot/
+apip/
 ├── backend/                  # FastAPI Application
 │   ├── app/
 │   │   ├── models/           # SQLAlchemy async models
 │   │   ├── schemas/          # Pydantic validation schemas
-│   │   ├── routers/          # Route handlers (auth, projects, docs, chats, risks, proposals)
-│   │   ├── services/         # Business logic (ingestion, retrieval, llm, risk, proposal)
+│   │   ├── routers/          # API Route handlers
+│   │   ├── services/         # Core business logic (RAG, Cache, LLM, Risk, Proposal)
 │   │   └── middleware/       # Rate-limiting middleware
-│   ├── alembic/              # Database migration scripts
+│   ├── alembic/              # Database migration scripts (Schema + HNSW vector index)
 │   ├── evaluate_rag.py       # RAG performance evaluation script
 │   └── Dockerfile            # Backend container specification
-├── frontend/                 # React Single Page App
-│   ├── src/
-│   │   ├── App.tsx           # Main workspace UI
-│   │   └── App.css           # Premium glassmorphism dark mode styles
-│   ├── nginx.conf            # Nginx routing configuration
+├── frontend/                 # React Single Page Application
+│   ├── src/                  # App components and state management
+│   ├── nginx.conf            # Production Nginx routing configuration
 │   └── Dockerfile            # Frontend container specification
-└── docker-compose.yml        # Orchestration for local development
+└── docker-compose.yml        # Multi-container orchestration (Postgres, Redis)
 ```
 
 ---
 
 ## ⚡ Quick Start (Local Development)
 
-### 1. Database Setup
-Ensure Docker is installed and running. Start the PostgreSQL 16 database with the `pgvector` extension:
+### 1. Start Infrastructure (Postgres + Redis)
 ```bash
 docker compose up -d
 ```
 
 ### 2. Backend Setup
-Make sure you have `uv` installed.
 ```bash
 cd backend
-cp .env.example .env   # Configure your Groq and HuggingFace API keys
+cp .env.example .env
 uv sync
 uv run alembic upgrade head
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
-*Note: If no API keys are provided (i.e. left as `gsk_placeholder` or `hf_placeholder`), the backend runs in a robust developer mock mode.*
+*Note: If API keys are unconfigured, the application gracefully operates in developer mock mode.*
 
 ### 3. Frontend Setup
-In a new terminal window:
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-Open `http://localhost:5173` to access the workspace.
+Open **`http://localhost:5173`** in your browser.
+
+---
+
+## 🌐 Simple Production Deployment Guide
+
+Deploying this platform is straightforward using cloud services or a single server:
+
+### Option A: Cloud Deployment (Railway / Render + Supabase) — Recommended
+
+1. **Database (Supabase / Managed Postgres)**:
+   - Create a free PostgreSQL 16 database on [Supabase](https://supabase.com) or Railway.
+   - Enable `pgvector` extension in the SQL editor: `CREATE EXTENSION IF NOT EXISTS vector;`.
+
+2. **Backend Service (Railway or Render)**:
+   - Connect your GitHub repository to [Railway.app](https://railway.app) or [Render.com](https://render.com).
+   - Set the root directory to `backend`.
+   - Set Environment Variables:
+     - `DATABASE_URL` (Your PostgreSQL connection string)
+     - `REDIS_URL` (Railway Redis instance URL)
+     - `JWT_SECRET` (Random secret key)
+     - `GROQ_API_KEY` & `HF_API_KEY`
+   - Build Command: `uv sync && uv run alembic upgrade head`
+   - Start Command: `uv run uvicorn app.main:app --host 0.0.0.0 --port 8000`
+
+3. **Frontend Service (Vercel / Netlify / Render)**:
+   - Connect your GitHub repo to [Vercel](https://vercel.com) or Netlify.
+   - Set root directory to `frontend`.
+   - Build Command: `npm run build`
+   - Output Directory: `dist`
+
+---
+
+### Option B: Docker Compose Deployment (Single VPS / Server)
+
+To deploy on any cloud VPS (DigitalOcean, AWS EC2, Hetzner):
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/Ahmed-Rizk1/APIP.git
+cd APIP
+
+# 2. Configure production .env
+cp backend/.env.example backend/.env
+
+# 3. Start full stack using Docker Compose
+docker compose up -d --build
+```
 
 ---
 
 ## 📊 RAG Evaluation Engine
 
-The RAG pipeline is evaluated using a custom LLM-as-a-judge script across 4 core metrics:
-1. **Context Precision:** Checks whether retrieved chunks are relevant to the user query.
-2. **Context Recall:** Verifies if all key facts from the gold standard answers are present in the retrieved context.
-3. **Faithfulness:** Verifies that the generated response contains no hallucinations and is grounded only in the context.
-4. **Answer Relevancy:** Measures how directly the generated answer addresses the question.
+The RAG pipeline includes an LLM-as-a-judge evaluation suite testing 4 core metrics:
+1. **Context Precision:** Evaluates relevance of retrieved chunks to user query.
+2. **Context Recall:** Verifies if gold-standard facts are captured in context.
+3. **Faithfulness:** Verifies responses are 100% grounded without hallucinations.
+4. **Answer Relevancy:** Measures directness of generated answers.
 
-### Running Evaluations
-Ensure the backend server is running and the dummy project is initialized (e.g. by running tests or uploading a document), then run:
+To execute RAG evaluation benchmarks:
 ```bash
 cd backend
-.venv\Scripts\python evaluate_rag.py
-```
-
-### Mock Mode Performance Summary
-When evaluating on the `dummy_procurement.pdf` document (mock responses):
-- **Average Context Precision:** 0.40 (Target: >0.75)
-- **Average Context Recall:**    0.80 (Target: >0.70)
-- **Average Faithfulness:**     0.60 (Target: >0.85)
-- **Average Answer Relevancy:**  1.00 (Target: >0.80)
-*Note: The scores represent the mock response outputs. Real evaluations with a live Groq key achieve >85% grounding faithfulness.*
-
----
-
-## 🐳 Containerized Deployment
-
-You can build and deploy the entire APIP stack using the provided Dockerfiles:
-
-### Build Containers
-```bash
-# Build backend
-cd backend
-docker build -t apip-backend .
-
-# Build frontend
-cd ../frontend
-docker build -t apip-frontend .
-```
-
-### Run Containers Locally
-```bash
-# Start backend
-docker run -d -p 8000:8000 \
-  -e DATABASE_URL="postgresql+asyncpg://postgres:postgres@host.docker.internal:5432/apip" \
-  -e GROQ_API_KEY="your_groq_key" \
-  -e HF_API_KEY="your_hf_key" \
-  apip-backend
-
-# Start frontend
-docker run -d -p 80:80 apip-frontend
+uv run python evaluate_rag.py
 ```

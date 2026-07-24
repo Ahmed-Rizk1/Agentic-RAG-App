@@ -10,15 +10,20 @@ from app.middleware.rate_limit import RateLimitMiddleware
 from app.routers import auth, projects, documents, chats, risks, proposals
 
 
+from app.services.cache import cache_service
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Ensure upload directory exists
     Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
+    # Initialize cache (Redis + memory fallback)
+    await cache_service.initialize()
     yield
 
 
 app = FastAPI(
-    title="APIP — Arabic Procurement Intelligence Platform",
+    title="Agentic RAG — Enterprise Document Intelligence Platform",
     version="0.1.0",
     lifespan=lifespan,
 )

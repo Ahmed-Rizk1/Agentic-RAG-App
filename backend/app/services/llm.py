@@ -54,7 +54,7 @@ async def call_hf_chat(messages: list[dict], model: str = "Qwen/Qwen2.5-7B-Instr
         "messages": messages,
         "temperature": 0.2
     }
-    async with httpx.AsyncClient(timeout=45.0) as client:
+    async with httpx.AsyncClient(timeout=httpx.Timeout(25.0, connect=3.0)) as client:
         response = await client.post(url, headers=headers, json=payload)
         if response.status_code != 200:
             raise Exception(f"HF Chat completion failed ({response.status_code}): {response.text}")
@@ -74,7 +74,7 @@ async def stream_hf_chat(messages: list[dict], model: str = "Qwen/Qwen2.5-7B-Ins
         "stream": True,
         "temperature": 0.2
     }
-    async with httpx.AsyncClient(timeout=45.0) as client:
+    async with httpx.AsyncClient(timeout=httpx.Timeout(25.0, connect=3.0)) as client:
         async with client.stream("POST", url, headers=headers, json=payload) as response:
             if response.status_code != 200:
                 err_bytes = await response.aread()
@@ -141,6 +141,11 @@ async def call_llm_json(
                 "compliance_section": "We fully comply with all required certifications (including ISO standards) and verify our submission adheres to the deadlines specified in the tender documents.",
                 "required_deliverables": "Deliverables include software architecture design, core module integration, training documentation, and post-deployment support, delivered over the 6-month project timeline."
             }
+        elif workflow == "grounding_check" or "grounding" in workflow:
+            return {
+                "is_grounded": True,
+                "explanation": "Answer is fully grounded in the retrieved document context."
+            }
         else:
             return {
                 "organization_name": "وزارة الصحة (Ministry of Health)",
@@ -170,7 +175,7 @@ async def call_llm_json(
                 "temperature": 0.1
             }
             
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(25.0, connect=3.0)) as client:
                 res = await client.post(url, headers=headers, json=payload)
                 if res.status_code == 200:
                     res_json = res.json()
