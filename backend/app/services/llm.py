@@ -44,7 +44,10 @@ async def save_llm_log(
 
 async def call_hf_chat(messages: list[dict], model: str = "Qwen/Qwen2.5-7B-Instruct") -> dict:
     """Fallback helper to call Hugging Face Inference API for chat completion."""
-    url = f"https://api-inference.huggingface.co/models/{model}/v1/chat/completions"
+    urls = [
+        f"https://router.huggingface.co/hf-inference/models/{model}/v1/chat/completions",
+        f"https://api-inference.huggingface.co/models/{model}/v1/chat/completions",
+    ]
     headers = {
         "Authorization": f"Bearer {settings.hf_api_key}",
         "Content-Type": "application/json"
@@ -54,16 +57,25 @@ async def call_hf_chat(messages: list[dict], model: str = "Qwen/Qwen2.5-7B-Instr
         "messages": messages,
         "temperature": 0.2
     }
-    async with httpx.AsyncClient(timeout=httpx.Timeout(25.0, connect=3.0)) as client:
-        response = await client.post(url, headers=headers, json=payload)
-        if response.status_code != 200:
-            raise Exception(f"HF Chat completion failed ({response.status_code}): {response.text}")
-        return response.json()
+    last_err = None
+    async with httpx.AsyncClient(timeout=httpx.Timeout(25.0, connect=5.0)) as client:
+        for url in urls:
+            try:
+                response = await client.post(url, headers=headers, json=payload)
+                if response.status_code == 200:
+                    return response.json()
+                last_err = f"HF Chat ({response.status_code}): {response.text}"
+            except Exception as ex:
+                last_err = str(ex)
+    raise Exception(f"All HF endpoints failed: {last_err}")
 
 
 async def stream_hf_chat(messages: list[dict], model: str = "Qwen/Qwen2.5-7B-Instruct") -> AsyncGenerator[str, None]:
     """Streams chat tokens from Hugging Face Inference API."""
-    url = f"https://api-inference.huggingface.co/models/{model}/v1/chat/completions"
+    urls = [
+        f"https://router.huggingface.co/hf-inference/models/{model}/v1/chat/completions",
+        f"https://api-inference.huggingface.co/models/{model}/v1/chat/completions",
+    ]
     headers = {
         "Authorization": f"Bearer {settings.hf_api_key}",
         "Content-Type": "application/json"
@@ -74,25 +86,36 @@ async def stream_hf_chat(messages: list[dict], model: str = "Qwen/Qwen2.5-7B-Ins
         "stream": True,
         "temperature": 0.2
     }
-    async with httpx.AsyncClient(timeout=httpx.Timeout(25.0, connect=3.0)) as client:
-        async with client.stream("POST", url, headers=headers, json=payload) as response:
-            if response.status_code != 200:
-                err_bytes = await response.aread()
-                raise Exception(f"HF Stream failed: {err_bytes.decode('utf-8')}")
-            async for line in response.aiter_lines():
-                line = line.strip()
-                if not line or not line.startswith("data: "):
-                    continue
-                data_str = line[6:]
-                if data_str == "[DONE]":
-                    break
-                try:
-                    chunk_json = json.loads(data_str)
-                    delta = chunk_json["choices"][0]["delta"]
-                    if "content" in delta:
-                        yield delta["content"]
-                except Exception:
-                    pass
+    streamed = False
+    last_err = None
+    async with httpx.AsyncClient(timeout=httpx.Timeout(25.0, connect=5.0)) as client:
+        for url in urls:
+            try:
+                async with client.stream("POST", url, headers=headers, json=payload) as response:
+                    if response.status_code == 200:
+                        async for line in response.aiter_lines():
+                            line = line.strip()
+                            if not line or not line.startswith("data: "):
+                                continue
+                            data_str = line[6:]
+                            if data_str == "[DONE]":
+                                break
+                            try:
+                                chunk_json = json.loads(data_str)
+                                delta = chunk_json["choices"][0]["delta"]
+                                if "content" in delta:
+                                    streamed = True
+                                    yield delta["content"]
+                            except Exception:
+                                pass
+                        if streamed:
+                            return
+                    else:
+                        err_bytes = await response.aread()
+                        last_err = f"HF Stream ({response.status_code}): {err_bytes.decode('utf-8', errors='ignore')}"
+            except Exception as ex:
+                last_err = str(ex)
+    raise Exception(f"All HF stream endpoints failed: {last_err}")
 
 
 async def call_llm_json(
@@ -314,6 +337,7 @@ async def stream_llm_generation(
         return
 
     # 2. Try Groq
+    groq_error = None
     if settings.groq_api_key != "gsk_placeholder":
         try:
             url = "https://api.groq.com/openai/v1/chat/completions"
@@ -366,9 +390,12 @@ async def stream_llm_generation(
                         ))
                         return
                     else:
-                        raise Exception(f"Groq API Stream returned status {response.status_code}")
+                        err_bytes = await response.aread()
+                        err_msg = err_bytes.decode('utf-8', errors='ignore')
+                        raise Exception(f"Groq API Stream returned status {response.status_code}: {err_msg}")
         except Exception as e:
-            logger.warning(f"Groq Stream failed, attempting HF fallback: {str(e)}")
+            groq_error = str(e)
+            logger.warning(f"Groq Stream failed, attempting HF fallback: {groq_error}")
             latency_ms = int((time.time() - start_time) * 1000)
             asyncio.create_task(save_llm_log(
                 user_id=user_id,
@@ -378,11 +405,12 @@ async def stream_llm_generation(
                 completion_tokens=None,
                 latency_ms=latency_ms,
                 success=False,
-                error_message=f"Groq stream failed: {str(e)}"
+                error_message=f"Groq stream failed: {groq_error}"
             ))
 
     # 3. Try Hugging Face
     hf_start_time = time.time()
+    hf_error = None
     try:
         messages = [
             {"role": "system", "content": system_prompt},
@@ -404,7 +432,8 @@ async def stream_llm_generation(
             success=True
         ))
     except Exception as e:
-        logger.error(f"HF Stream fallback failed: {str(e)}")
+        hf_error = str(e)
+        logger.error(f"HF Stream fallback failed: {hf_error}")
         latency_ms = int((time.time() - hf_start_time) * 1000)
         asyncio.create_task(save_llm_log(
             user_id=user_id,
@@ -414,14 +443,23 @@ async def stream_llm_generation(
             completion_tokens=None,
             latency_ms=latency_ms,
             success=False,
-            error_message=f"HF stream failed: {str(e)}"
+            error_message=f"HF stream failed: {hf_error}"
         ))
-        yield "\n\n[System Notification: Live LLM API endpoints are currently unreachable (network connection error). Running in offline fallback mode.]\n\n"
+        
+        diag_details = []
+        if groq_error:
+            diag_details.append(f"Groq: {groq_error}")
+        if hf_error:
+            diag_details.append(f"HuggingFace: {hf_error}")
+        diag_str = " | ".join(diag_details) if diag_details else "API keys not configured or endpoints unreachable."
+        
+        yield f"\n\n[System Notification: Live LLM API endpoints unreachable ({diag_str}). Running in offline fallback mode.]\n\n"
         fallback_msg = (
-            "Here is the offline fallback answer: The platform has successfully processed your request, "
-            "but is currently operating in offline/local mock mode because the Groq and HuggingFace API endpoints "
-            "are unreachable from this server. Please check your internet connection or verify your API keys in the `.env` file."
+            "Here is the offline fallback answer: The platform has processed your request, "
+            "but is operating in fallback mode because external LLM APIs returned errors. "
+            "Please check your `GROQ_API_KEY` and `HF_API_KEY` in your deployment environment settings."
         )
         for chunk in fallback_msg.split():
             yield chunk + " "
             await asyncio.sleep(0.05)
+
