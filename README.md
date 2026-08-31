@@ -4,7 +4,7 @@ An enterprise-grade, production-ready **Agentic RAG Platform** engineered for de
 
 The system integrates **Hybrid RAG (Dense Vector + BM25 Sparse Search)**, **Multi-Agent State Machines (LangGraph)**, **Self-Correction Grounding Guardrails**, **Redis Caching**, and **HNSW Indexing** to deliver high-precision document intelligence with sub-5ms retrieval speeds.
 
-Live Demo : https://agentic-rag-app-uj6y.onrender.com
+Live Demo : https://agentic-rag-app-steel.vercel.app/
 ---
 
 ##  Key Features & Capabilities
