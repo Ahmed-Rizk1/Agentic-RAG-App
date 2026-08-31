@@ -7,7 +7,7 @@ The system integrates **Hybrid RAG (Dense Vector + BM25 Sparse Search)**, **Mult
 Live Demo : https://agentic-rag-app-uj6y.onrender.com
 ---
 
-## 🚀 Key Features & Capabilities
+##  Key Features & Capabilities
 
 1. **Document Ingestion & Asynchronous Parsing:**
    - Multi-format PDF processing with page-level tracking via `PyMuPDF`.
@@ -36,7 +36,7 @@ Live Demo : https://agentic-rag-app-uj6y.onrender.com
 
 ---
 
-## 🛠️ Technology Stack
+##  Technology Stack
 
 | Layer | Technology | Details |
 |---|---|---|
@@ -51,7 +51,7 @@ Live Demo : https://agentic-rag-app-uj6y.onrender.com
 
 ---
 
-## 📁 Repository Layout
+##  Repository Layout
 
 ```text
 apip/
@@ -101,7 +101,7 @@ Open **`http://localhost:5173`** in your browser.
 
 ---
 
-## 🌐 Simple Production Deployment Guide
+##  Simple Production Deployment Guide
 
 Deploying this platform is straightforward using cloud services or a single server:
 
@@ -148,7 +148,7 @@ docker compose up -d --build
 
 ---
 
-## 📊 RAG Evaluation Engine
+##  RAG Evaluation Engine
 
 The RAG pipeline includes an LLM-as-a-judge evaluation suite testing 4 core metrics:
 1. **Context Precision:** Evaluates relevance of retrieved chunks to user query.
