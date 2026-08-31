@@ -180,59 +180,70 @@ async def call_llm_json(
                 "language": "en"
             }
 
-    # 2. Try Groq
+    # 2. Try Groq (with automatic fallback across active Groq models)
     if settings.groq_api_key != "gsk_placeholder":
-        try:
-            url = "https://api.groq.com/openai/v1/chat/completions"
-            headers = {
-                "Authorization": f"Bearer {settings.groq_api_key}",
-                "Content-Type": "application/json"
-            }
-            payload = {
-                "model": settings.groq_model,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": prompt}
-                ],
-                "response_format": {"type": "json_object"},
-                "temperature": 0.1
-            }
-            
-            async with httpx.AsyncClient(timeout=httpx.Timeout(25.0, connect=3.0)) as client:
-                res = await client.post(url, headers=headers, json=payload)
-                if res.status_code == 200:
-                    res_json = res.json()
-                    content = res_json["choices"][0]["message"]["content"]
-                    usage = res_json.get("usage", {})
+        candidate_models = [settings.groq_model]
+        for m in ["llama-3.1-8b-instant", "llama3-8b-8192", "llama-3.3-70b-versatile", "llama-3.1-70b-versatile", "llama3-70b-8192", "mixtral-8x7b-32768"]:
+            if m not in candidate_models:
+                candidate_models.append(m)
+
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {settings.groq_api_key}",
+            "Content-Type": "application/json"
+        }
+
+        for model_id in candidate_models:
+            try:
+                payload = {
+                    "model": model_id,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": prompt}
+                    ],
+                    "response_format": {"type": "json_object"},
+                    "temperature": 0.1
+                }
+                
+                async with httpx.AsyncClient(timeout=httpx.Timeout(25.0, connect=3.0)) as client:
+                    res = await client.post(url, headers=headers, json=payload)
+                    if res.status_code == 200:
+                        res_json = res.json()
+                        content = res_json["choices"][0]["message"]["content"]
+                        usage = res_json.get("usage", {})
+                        latency_ms = int((time.time() - start_time) * 1000)
+                        
+                        # Log success
+                        asyncio.create_task(save_llm_log(
+                            user_id=user_id,
+                            workflow=workflow,
+                            model=model_id,
+                            prompt_tokens=usage.get("prompt_tokens"),
+                            completion_tokens=usage.get("completion_tokens"),
+                            latency_ms=latency_ms,
+                            success=True
+                        ))
+                        return json.loads(content)
+                    elif res.status_code == 404 or "model_not_found" in res.text:
+                        logger.warning(f"Groq model {model_id} not available on this account, trying next candidate model...")
+                        continue
+                    else:
+                        raise Exception(f"Groq API returned error status {res.status_code}: {res.text}")
+            except Exception as e:
+                logger.warning(f"Groq model {model_id} call failed: {str(e)}")
+                if model_id == candidate_models[-1]:
+                    # Log failure for final attempt
                     latency_ms = int((time.time() - start_time) * 1000)
-                    
-                    # Log success
                     asyncio.create_task(save_llm_log(
                         user_id=user_id,
                         workflow=workflow,
-                        model=settings.groq_model,
-                        prompt_tokens=usage.get("prompt_tokens"),
-                        completion_tokens=usage.get("completion_tokens"),
+                        model=model_id,
+                        prompt_tokens=None,
+                        completion_tokens=None,
                         latency_ms=latency_ms,
-                        success=True
+                        success=False,
+                        error_message=f"Groq Failed: {str(e)}"
                     ))
-                    return json.loads(content)
-                else:
-                    raise Exception(f"Groq API returned error status {res.status_code}: {res.text}")
-        except Exception as e:
-            logger.warning(f"Groq call failed, attempting HF fallback: {str(e)}")
-            # Log failure for first attempt
-            latency_ms = int((time.time() - start_time) * 1000)
-            asyncio.create_task(save_llm_log(
-                user_id=user_id,
-                workflow=workflow,
-                model=settings.groq_model,
-                prompt_tokens=None,
-                completion_tokens=None,
-                latency_ms=latency_ms,
-                success=False,
-                error_message=f"Groq Failed: {str(e)}"
-            ))
 
     # 3. Fallback to Hugging Face
     hf_start_time = time.time()
@@ -336,77 +347,90 @@ async def stream_llm_generation(
         asyncio.create_task(save_llm_log(user_id, workflow, "mock-llama", 100, 50, 500, True))
         return
 
-    # 2. Try Groq
+    # 2. Try Groq (with automatic fallback across active Groq models)
     groq_error = None
     if settings.groq_api_key != "gsk_placeholder":
-        try:
-            url = "https://api.groq.com/openai/v1/chat/completions"
-            headers = {
-                "Authorization": f"Bearer {settings.groq_api_key}",
-                "Content-Type": "application/json"
-            }
-            payload = {
-                "model": settings.groq_model,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": prompt}
-                ],
-                "stream": True,
-                "temperature": 0.2
-            }
-            
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                async with client.stream("POST", url, headers=headers, json=payload) as response:
-                    if response.status_code == 200:
-                        full_content = ""
-                        async for line in response.aiter_lines():
-                            line = line.strip()
-                            if not line or not line.startswith("data: "):
+        candidate_models = [settings.groq_model]
+        for m in ["llama-3.1-8b-instant", "llama3-8b-8192", "llama-3.3-70b-versatile", "llama-3.1-70b-versatile", "llama3-70b-8192", "mixtral-8x7b-32768"]:
+            if m not in candidate_models:
+                candidate_models.append(m)
+
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {settings.groq_api_key}",
+            "Content-Type": "application/json"
+        }
+
+        for model_id in candidate_models:
+            try:
+                payload = {
+                    "model": model_id,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": prompt}
+                    ],
+                    "stream": True,
+                    "temperature": 0.2
+                }
+                
+                streamed = False
+                full_content = ""
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    async with client.stream("POST", url, headers=headers, json=payload) as response:
+                        if response.status_code == 200:
+                            async for line in response.aiter_lines():
+                                line = line.strip()
+                                if not line or not line.startswith("data: "):
+                                    continue
+                                data_str = line[6:]
+                                if data_str == "[DONE]":
+                                    break
+                                try:
+                                    chunk_json = json.loads(data_str)
+                                    delta = chunk_json["choices"][0]["delta"]
+                                    if "content" in delta:
+                                        token = delta["content"]
+                                        full_content += token
+                                        streamed = True
+                                        yield token
+                                except Exception:
+                                    pass
+                            
+                            if streamed:
+                                latency_ms = int((time.time() - start_time) * 1000)
+                                words = len(full_content.split())
+                                asyncio.create_task(save_llm_log(
+                                    user_id=user_id,
+                                    workflow=workflow,
+                                    model=model_id,
+                                    prompt_tokens=int(len(prompt.split()) * 1.3),
+                                    completion_tokens=int(words * 1.3),
+                                    latency_ms=latency_ms,
+                                    success=True
+                                ))
+                                return
+                        else:
+                            err_bytes = await response.aread()
+                            err_msg = err_bytes.decode('utf-8', errors='ignore')
+                            if response.status_code == 404 or "model_not_found" in err_msg:
+                                logger.warning(f"Groq stream model {model_id} not available, trying next candidate model...")
                                 continue
-                            data_str = line[6:]
-                            if data_str == "[DONE]":
-                                break
-                            try:
-                                chunk_json = json.loads(data_str)
-                                delta = chunk_json["choices"][0]["delta"]
-                                if "content" in delta:
-                                    token = delta["content"]
-                                    full_content += token
-                                    yield token
-                            except Exception:
-                                pass
-                        
-                        latency_ms = int((time.time() - start_time) * 1000)
-                        # Log success (estimate token counts from word count: approx 1.3 tokens per word)
-                        words = len(full_content.split())
-                        asyncio.create_task(save_llm_log(
-                            user_id=user_id,
-                            workflow=workflow,
-                            model=settings.groq_model,
-                            prompt_tokens=int(len(prompt.split()) * 1.3),
-                            completion_tokens=int(words * 1.3),
-                            latency_ms=latency_ms,
-                            success=True
-                        ))
-                        return
-                    else:
-                        err_bytes = await response.aread()
-                        err_msg = err_bytes.decode('utf-8', errors='ignore')
-                        raise Exception(f"Groq API Stream returned status {response.status_code}: {err_msg}")
-        except Exception as e:
-            groq_error = str(e)
-            logger.warning(f"Groq Stream failed, attempting HF fallback: {groq_error}")
-            latency_ms = int((time.time() - start_time) * 1000)
-            asyncio.create_task(save_llm_log(
-                user_id=user_id,
-                workflow=workflow,
-                model=settings.groq_model,
-                prompt_tokens=None,
-                completion_tokens=None,
-                latency_ms=latency_ms,
-                success=False,
-                error_message=f"Groq stream failed: {groq_error}"
-            ))
+                            raise Exception(f"Groq API Stream returned status {response.status_code}: {err_msg}")
+            except Exception as e:
+                groq_error = str(e)
+                logger.warning(f"Groq Stream model {model_id} failed: {groq_error}")
+                if model_id == candidate_models[-1]:
+                    latency_ms = int((time.time() - start_time) * 1000)
+                    asyncio.create_task(save_llm_log(
+                        user_id=user_id,
+                        workflow=workflow,
+                        model=model_id,
+                        prompt_tokens=None,
+                        completion_tokens=None,
+                        latency_ms=latency_ms,
+                        success=False,
+                        error_message=f"Groq stream failed: {groq_error}"
+                    ))
 
     # 3. Try Hugging Face
     hf_start_time = time.time()
