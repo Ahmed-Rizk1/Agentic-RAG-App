@@ -1,0 +1,57 @@
+services:
+  # --- Backend FastAPI Web Service ---
+  - type: web
+    name: apip-backend
+    runtime: python
+    rootDir: backend
+    plan: free
+    buildCommand: "pip install uv && uv sync && uv run alembic upgrade head"
+    startCommand: "uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: apip-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: apip-redis
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_ALGORITHM
+        value: "HS256"
+      - key: JWT_EXPIRE_MINUTES
+        value: "1440"
+      - key: GROQ_API_KEY
+        sync: false
+      - key: HF_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: "llama-3.3-70b-versatile"
+      - key: HF_EMBEDDING_MODEL
+        value: "BAAI/bge-m3"
+      - key: UPLOAD_DIR
+        value: "uploads"
+      - key: MAX_FILE_SIZE_MB
+        value: "50"
+      - key: RATE_LIMIT_PER_MINUTE
+        value: "100"
+      - key: RATE_LIMIT_PER_DAY
+        value: "1000"
+
+  # --- Redis Caching Service ---
+  - type: redis
+    name: apip-redis
+    plan: free
+    ipAllowList: [] # internal access only
+
+databases:
+  # --- PostgreSQL with pgvector support ---
+  - name: apip-postgres
+    plan: free
+    databaseName: apip
+    user: apip
+    postgresMajorVersion: 16
